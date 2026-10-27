@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#101827">
+<meta name="description" content="Geçmiş futbol maçlarının MS oranlarını ve skorlarını CSV üzerinden analiz eder.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<title>Maç Oran Analiz</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1220;--panel:#131e30;--panel2:#1a2940;--text:#edf3fb;--muted:#a8b7cc;--line:#2b3b53;--accent:#79d6b3;--warn:#ffcf7b;--bad:#ff9e9e}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.45 system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+header{padding:20px 16px 16px;background:#101827;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+h1{font-size:1.35rem;margin:0 0 4px}header p{margin:0;color:var(--muted);font-size:.9rem}
+main{max-width:980px;margin:auto;padding:14px;display:grid;gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:16px;min-width:0}
+h2{font-size:1.08rem;margin:0 0 12px}h3{font-size:1rem;margin:0 0 8px}
+p{margin:7px 0}.muted{color:var(--muted)}.small{font-size:.86rem}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}label{font-size:.88rem;color:var(--muted)}
+input,select,button{font:inherit;border-radius:10px;border:1px solid var(--line);padding:11px 10px;min-width:0}
+input,select{background:#0d1727;color:var(--text);width:100%}
+input[type=file]{padding:9px;font-size:.9rem}
+button{background:var(--accent);color:#08251c;border:0;font-weight:700;cursor:pointer}
+button.secondary{background:var(--panel2);color:var(--text);border:1px solid var(--line)}
+button:disabled{opacity:.45;cursor:not-allowed}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}.actions button{flex:1 1 140px}
+.note{border-left:3px solid var(--warn);padding:9px 11px;background:#241f18;border-radius:6px;color:#f6e2bf}
+.success{border-left-color:var(--accent);background:#10251f;color:#d5f7e9}
+.error{border-left-color:var(--bad);background:#2a191e;color:#ffd9dc}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.stat{background:var(--panel2);padding:11px;border-radius:12px;min-width:0}.stat strong{display:block;font-size:1.25rem;overflow-wrap:anywhere}.stat span{font-size:.78rem;color:var(--muted)}
+.bars{display:grid;gap:9px;margin-top:12px}.barrow{display:grid;grid-template-columns:52px 1fr 52px;gap:8px;align-items:center;font-size:.9rem}
+.track{height:10px;border-radius:20px;background:#29364a;overflow:hidden}.fill{height:100%;background:var(--accent);width:0}
+.tablewrap{overflow:auto;max-width:100%;border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;min-width:720px;font-size:.84rem}th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}th{background:#1a2940;position:sticky;top:0}tr:last-child td{border-bottom:0}
+details{margin-top:10px}summary{cursor:pointer;color:var(--accent)}
+.hidden{display:none!important}.pill{display:inline-block;border:1px solid var(--line);border-radius:30px;padding:3px 8px;font-size:.78rem;color:var(--muted)}
+footer{padding:6px 16px 28px;text-align:center;color:var(--muted);font-size:.8rem}
+@media(max-width:560px){.grid{grid-template-columns:1fr 1fr}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.card{padding:13px}header{position:static}.grid .field:last-child{grid-column:1/-1}}
+</style>
+</head>
+<body>
+<header>
+  <h1>⚽ Maç Oran Analiz</h1>
+  <p>Geçmiş maçları kendi CSV verinle karşılaştır</p>
+</header>
+<main>
+  <section class="card">
+    <h2>1. Geçmiş maç verisini yükle</h2>
+    <p class="small muted">CSV dosyası seç. Dosyan cihazında işlenir; bir sunucuya gönderilmez. Excel dosyan varsa önce CSV UTF-8 olarak dışa aktar.</p>
+    <div class="field">
+      <label for="file">CSV dosyası</label>
+      <input id="file" type="file" accept=".csv,text/csv">
+    </div>
+    <div id="importStatus" class="note" style="margin-top:10px">Henüz veri yüklenmedi. Örnek şablon indirebilir veya kendi CSV dosyanı seçebilirsin.</div>
+    <div class="actions">
+      <button class="secondary" id="templateBtn">CSV şablonunu indir</button>
+      <button class="secondary" id="clearBtn">Veriyi temizle</button>
+    </div>
+    <details>
+      <summary>CSV dosyasında gereken sütunlar</summary>
+      <p class="small">Zorunlu: <code>HomeTeam, AwayTeam, B365H, B365D, B365A</code> veya eşdeğer sütunlar. Sonuç yüzdeleri için <code>FTHG, FTAG</code>; ilk yarı skorları için <code>HTHG, HTAG</code>; lig için <code>Div</code>; tarih için <code>Date</code> kullanılabilir.</p>
+      <p class="small">Alternatif Türkçe başlıklar: EvSahibi, Deplasman, MS1, MSX, MS2, EvGol, DepGol, IYEvGol, IYDepGol, Lig, Tarih. Uygulama başlıkları tanımaya çalışır; eşleşmeyen sütunları aşağıdaki alanlardan elle seçebilirsin.</p>
+    </details>
+  </section>
+
+  <section class="card">
+    <h2>2. Oranları gir ve eşleştir</h2>
+    <div class="grid">
+      <div class="field"><label for="od1">MS1 oranı</label><input id="od1" inputmode="decimal" placeholder="2.10"></div>
+      <div class="field"><label for="odx">MSX oranı</label><input id="odx" inputmode="decimal" placeholder="3.20"></div>
+      <div class="field"><label for="od2">MS2 oranı</label><input id="od2" inputmode="decimal" placeholder="3.40"></div>
+    </div>
+    <div class="grid" style="margin-top:10px">
+      <div class="field"><label for="tolerance">Yakın oran toleransı</label>
+        <select id="tolerance"><option value="0.05">±0,05</option><option value="0.10" selected>±0,10</option><option value="0.20">±0,20</option><option value="0.30">±0,30</option><option value="0.50">±0,50</option></select>
+      </div>
+      <div class="field"><label for="oddsSource">Oran sütunları</label>
+        <select id="oddsSource"><option value="auto">Otomatik (B365 veya MS1/MSX/MS2)</option></select>
+      </div>
+      <div class="field"><label for="leagueFilter">Lig filtresi</label><select id="leagueFilter"><option value="">Tüm ligler</option></select></div>
+    </div>
+    <div class="actions"><button id="analyzeBtn" disabled>Maçları analiz et</button></div>
+    <p class="small muted">Tam eşleşme: üç oran da iki ondalık basamakta aynı. Yakın eşleşme: üç oranın her biri seçilen tolerans içinde. İki grup ayrı raporlanır.</p>
+  </section>
+
+  <section id="mappingCard" class="card hidden">
+    <h2>3. Sütun eşleştirme</h2>
+    <p class="small muted">Otomatik tanıma doğru değilse alanları elle seç. Sonra tekrar analiz et.</p>
+    <div id="mappingFields" class="grid"></div>
+  </section>
+
+  <section id="results" class="card">
+    <h2>Analiz sonuçları</h2>
+    <p class="muted">Analiz yapmak için önce veri yükle ve oranları gir.</p>
+  </section>
+
+  <section class="card">
+    <h2>Veri kapsamı ve sınırlamalar</h2>
+    <ul class="small">
+      <li>Bu uygulama kendiliğinden Maçkolik'e bağlanmaz ve internetten maç verisi çekmez.</li>
+      <li>Yalnızca yüklediğin CSV içindeki kayıtlar analiz edilir. Veri kaynağının kapsamadığı lig veya oranlar sonuçlara dahil olmaz.</li>
+      <li>Boş oranlar, skorlar veya eksik sütunlar istatistikleri etkileyebilir; raporda mevcut kayıt sayısı belirtilir.</li>
+      <li>Sonuç yüzdeleri geçmiş örneklemin dağılımıdır; gelecekteki maç için garanti veya kesin olasılık değildir.</li>
+    </ul>
+  </section>
+</main>
+<footer>Maç Oran Analiz • Ücretsiz yerel PWA • Veriler bu cihazda işlenir</footer>
+<script src="app.js"></script>
+</body>
+</html>
